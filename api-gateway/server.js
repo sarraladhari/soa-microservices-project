@@ -10,6 +10,10 @@ const PORT = 4000;
 app.use(cors());
 app.use(express.json());
 
+// =======================
+// PRODUCT SERVICE CLIENT
+// =======================
+
 const PRODUCT_PROTO_PATH = path.join(__dirname, '../proto/product.proto');
 
 const productPackageDefinition = protoLoader.loadSync(PRODUCT_PROTO_PATH, {
@@ -27,11 +31,40 @@ const productClient = new productProto.ProductService(
   grpc.credentials.createInsecure()
 );
 
+// =======================
+// CUSTOMER SERVICE CLIENT
+// =======================
+
+const CUSTOMER_PROTO_PATH = path.join(__dirname, '../proto/customer.proto');
+
+const customerPackageDefinition = protoLoader.loadSync(CUSTOMER_PROTO_PATH, {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true
+});
+
+const customerProto = grpc.loadPackageDefinition(customerPackageDefinition).customer;
+
+const customerClient = new customerProto.CustomerService(
+  'localhost:50052',
+  grpc.credentials.createInsecure()
+);
+
+// =======================
+// HOME ROUTE
+// =======================
+
 app.get('/', (req, res) => {
   res.json({
     message: 'API Gateway SOA Microservices fonctionne'
   });
 });
+
+// =======================
+// PRODUCT ROUTES
+// =======================
 
 app.post('/products', (req, res) => {
   const { name, brand, price, description } = req.body;
@@ -97,6 +130,51 @@ app.delete('/products/:id', (req, res) => {
     res.json(response);
   });
 });
+
+// =======================
+// CUSTOMER ROUTES
+// =======================
+
+app.post('/customers', (req, res) => {
+  const { name, email, phone } = req.body;
+
+  customerClient.CreateCustomer(
+    { name, email, phone },
+    (err, response) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+
+      res.status(201).json(response);
+    }
+  );
+});
+
+app.get('/customers', (req, res) => {
+  customerClient.GetAllCustomers({}, (err, response) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    res.json(response);
+  });
+});
+
+app.get('/customers/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+
+  customerClient.GetCustomer({ id }, (err, response) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    res.json(response);
+  });
+});
+
+// =======================
+// START SERVER
+// =======================
 
 app.listen(PORT, () => {
   console.log(`API Gateway démarrée sur le port ${PORT}`);
