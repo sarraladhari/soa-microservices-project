@@ -3,7 +3,8 @@ const cors = require('cors');
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 const path = require('path');
-
+const { expressMiddleware } = require('@as-integrations/express4');
+const createGraphQLServer = require('./graphql');
 const app = express();
 const PORT = 4000;
 
@@ -238,6 +239,21 @@ app.get('/orders/:id', (req, res) => {
 // START SERVER
 // =======================
 
-app.listen(PORT, () => {
-  console.log(`API Gateway démarrée sur le port ${PORT}`);
-});
+async function startServer() {
+  const graphqlServer = createGraphQLServer(
+    productClient,
+    customerClient,
+    orderClient
+  );
+
+  await graphqlServer.start();
+
+  app.use('/graphql', expressMiddleware(graphqlServer));
+
+  app.listen(PORT, () => {
+    console.log(`API Gateway démarrée sur le port ${PORT}`);
+    console.log(`GraphQL disponible sur http://localhost:${PORT}/graphql`);
+  });
+}
+
+startServer();
