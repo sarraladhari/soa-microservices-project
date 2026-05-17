@@ -53,6 +53,27 @@ const customerClient = new customerProto.CustomerService(
 );
 
 // =======================
+// ORDER SERVICE CLIENT
+// =======================
+
+const ORDER_PROTO_PATH = path.join(__dirname, '../proto/order.proto');
+
+const orderPackageDefinition = protoLoader.loadSync(ORDER_PROTO_PATH, {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true
+});
+
+const orderProto = grpc.loadPackageDefinition(orderPackageDefinition).order;
+
+const orderClient = new orderProto.OrderService(
+  'localhost:50053',
+  grpc.credentials.createInsecure()
+);
+
+// =======================
 // HOME ROUTE
 // =======================
 
@@ -164,6 +185,47 @@ app.get('/customers/:id', (req, res) => {
   const id = parseInt(req.params.id);
 
   customerClient.GetCustomer({ id }, (err, response) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    res.json(response);
+  });
+});
+
+// =======================
+// ORDER ROUTES
+// =======================
+
+app.post('/orders', (req, res) => {
+  const { customer_id, product_id, quantity, total_price } = req.body;
+
+  orderClient.CreateOrder(
+    { customer_id, product_id, quantity, total_price },
+    (err, response) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+
+      res.status(201).json(response);
+    }
+  );
+});
+
+app.get('/orders', (req, res) => {
+  orderClient.GetAllOrders({}, (err, response) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    res.json(response);
+  });
+});
+
+app.get('/orders/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+
+  orderClient.GetOrder({ id }, (err, response) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
