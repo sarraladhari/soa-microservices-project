@@ -2,7 +2,7 @@ const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 const path = require('path');
 const db = require('./database');
-
+const { connectProducer, sendOrderCreatedEvent } = require('./kafkaProducer');
 const PROTO_PATH = path.join(__dirname, '../proto/order.proto');
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -44,10 +44,21 @@ function createOrder(call, callback) {
         status
       };
 
-      callback(null, {
-        order,
-        message: 'Commande créée avec succès'
-      });
+      sendOrderCreatedEvent(order)
+  .then(() => {
+    callback(null, {
+      order,
+      message: 'Commande créée avec succès et événement Kafka envoyé'
+    });
+  })
+  .catch((error) => {
+    console.error('Erreur Kafka :', error.message);
+
+    callback(null, {
+      order,
+      message: 'Commande créée, mais erreur lors de l’envoi Kafka'
+    });
+  });
     }
   );
 }
@@ -97,7 +108,8 @@ server.addService(orderProto.OrderService.service, {
 server.bindAsync(
   '0.0.0.0:50053',
   grpc.ServerCredentials.createInsecure(),
-  () => {
-    console.log('Order Service gRPC démarré sur le port 50053');
-  }
+  async () => {
+  await connectProducer();
+  console.log('Order Service gRPC démarré sur le port 50053');
+}
 );
