@@ -3,6 +3,7 @@ const protoLoader = require('@grpc/proto-loader');
 const path = require('path');
 const db = require('./database');
 const { connectProducer, sendOrderCreatedEvent } = require('./kafkaProducer');
+
 const PROTO_PATH = path.join(__dirname, '../proto/order.proto');
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -16,12 +17,7 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 const orderProto = grpc.loadPackageDefinition(packageDefinition).order;
 
 function createOrder(call, callback) {
-  const {
-    customer_id,
-    product_id,
-    quantity,
-    total_price
-  } = call.request;
+  const { customer_id, product_id, quantity, total_price } = call.request;
 
   const status = 'PENDING';
 
@@ -45,20 +41,20 @@ function createOrder(call, callback) {
       };
 
       sendOrderCreatedEvent(order)
-  .then(() => {
-    callback(null, {
-      order,
-      message: 'Commande créée avec succès et événement Kafka envoyé'
-    });
-  })
-  .catch((error) => {
-    console.error('Erreur Kafka :', error.message);
+        .then(() => {
+          callback(null, {
+            order,
+            message: 'Commande créée avec succès et événement Kafka envoyé'
+          });
+        })
+        .catch((error) => {
+          console.error('Erreur Kafka :', error.message);
 
-    callback(null, {
-      order,
-      message: 'Commande créée, mais erreur lors de l’envoi Kafka'
-    });
-  });
+          callback(null, {
+            order,
+            message: 'Commande créée, mais erreur lors de l’envoi Kafka'
+          });
+        });
     }
   );
 }
@@ -105,11 +101,20 @@ server.addService(orderProto.OrderService.service, {
   GetAllOrders: getAllOrders
 });
 
-server.bindAsync(
-  '0.0.0.0:50053',
-  grpc.ServerCredentials.createInsecure(),
-  async () => {
-  await connectProducer();
-  console.log('Order Service gRPC démarré sur le port 50053');
+async function startServer() {
+  try {
+    await connectProducer();
+
+    server.bindAsync(
+      '0.0.0.0:50053',
+      grpc.ServerCredentials.createInsecure(),
+      () => {
+        console.log('Order Service gRPC démarré sur le port 50053');
+      }
+    );
+  } catch (error) {
+    console.error('Erreur au démarrage du Order Service :', error.message);
+  }
 }
-);
+
+startServer();
